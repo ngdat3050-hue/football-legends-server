@@ -896,7 +896,9 @@ app.post("/api/admin/cards/generate", requireAdmin, (req, res) => {
    CREATE DEFAULT ADMIN
 ========================= */
 
-let admin = db.users.find(u => u.username === ADMIN_USER);
+let admin = db.users.find(
+  u => String(u.username).toLowerCase() === String(ADMIN_USER).toLowerCase()
+);
 
 if (!admin) {
   admin = {
@@ -905,39 +907,38 @@ if (!admin) {
     passwordHash: hashPassword(ADMIN_PASS),
     nickname: "ADMIN",
     playerId: makePlayerId(),
-
     avatar: "",
     title: "ADMIN",
-
     coins: 999999999,
     gems: 999999,
     tickets: 99999,
-
     level: 100,
     xp: 0,
-
     owned: [],
     squad: [],
     formation: "4-3-3",
-
     packCounts: {
       bronze: 999,
       silver: 999,
       gold: 999,
       premium: 999
     },
-
     mailbox: [],
     friends: [],
     friendRequests: [],
-
     isAdmin: true
   };
 
   db.users.push(admin);
-  saveDb();
+} else {
+  // Đồng bộ lại tài khoản Admin
+  admin.passwordHash = hashPassword(ADMIN_PASS);
+  admin.isAdmin = true;
+  admin.nickname = "ADMIN";
+  admin.title = "ADMIN";
 }
 
+saveDb();
 /* =========================
    START SERVER
 ========================= */
