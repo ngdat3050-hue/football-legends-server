@@ -189,11 +189,7 @@ function getUserFromToken(req) {
   );
 }
 
-function requireLogin(
-  req,
-  res,
-  next
-) {
+function requireLogin(req, res, next) {
   const user =
     getUserFromToken(req);
 
@@ -208,19 +204,14 @@ function requireLogin(
   next();
 }
 
-function requireAdmin(
-  req,
-  res,
-  next
-) {
+function requireAdmin(req, res, next) {
   const user =
     getUserFromToken(req);
 
   if (!user || !user.isAdmin) {
     return res.status(403).json({
       ok: false,
-      error:
-        "Bạn không có quyền admin"
+      error: "Bạn không có quyền admin"
     });
   }
 
@@ -569,13 +560,7 @@ if (!db.cards.length) {
   generateCardCatalog();
 }
 
-/* =========================================================
-   USER SHAPE
-========================================================= */
-
-function ensureUserShape(
-  user
-) {
+function ensureUserShape(user) {
   if (!user.playerId) {
     user.playerId =
       makePlayerId();
@@ -1648,9 +1633,7 @@ app.get(
    PACK
 ========================================================= */
 
-function packPrice(
-  pack
-) {
+function packPrice(pack) {
   return (
     {
       bronze: 5000,
@@ -1661,9 +1644,7 @@ function packPrice(
   );
 }
 
-function allowedRarities(
-  pack
-) {
+function allowedRarities(pack) {
 
   if (
     pack === "premium"
@@ -1702,9 +1683,7 @@ function allowedRarities(
   ];
 }
 
-function choosePackCard(
-  pack
-) {
+function choosePackCard(pack) {
 
   const allowed =
     allowedRarities(
@@ -2106,9 +2085,7 @@ app.get(
   }
 );
 
-function marketPriceFor(
-  card
-) {
+function marketPriceFor(card) {
 
   return Math.max(
     1000,
@@ -2370,13 +2347,12 @@ app.post(
     if (pack) {
 
       if (
-        !Object.prototype.hasOwnProperty.call(
-          {
-            bronze: 1,
-            silver: 1,
-            gold: 1,
-            premium: 1
-          },
+        ![
+          "bronze",
+          "silver",
+          "gold",
+          "premium"
+        ].includes(
           pack
         )
       ) {
@@ -2414,8 +2390,7 @@ app.post(
             `Admin đã gửi ${packAmount} ${pack} Pack. Vào Hộp thư để nhận.`,
 
           createdAt:
-            new Date()
-              .toISOString()
+            new Date().toISOString()
         }
       );
 
@@ -2435,7 +2410,7 @@ app.post(
 );
 
 /* =========================================================
-   ADMIN MARKET PRICE
+   ADMIN PRICE
 ========================================================= */
 
 app.post(
@@ -2472,9 +2447,7 @@ app.post(
 
     }
 
-    db.market[
-      item
-    ] =
+    db.market[item] =
       price;
 
     saveDb();
@@ -2675,10 +2648,6 @@ if (!admin) {
 }
 
 saveDb();
-
-/* =========================================================
-   START
-========================================================= */
 
 app.listen(
   PORT,
