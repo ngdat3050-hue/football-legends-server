@@ -10,12 +10,11 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 10000;
+const DB_FILE = path.join(__dirname, "database.json");
+const PLAYERS_FILE = path.join(__dirname, "players.json");
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "5mb" }));
-
-const DB_FILE = path.join(__dirname, "database.json");
-const PLAYERS_FILE = path.join(__dirname, "players.json");
 
 function loadDb() {
   try {
@@ -30,26 +29,35 @@ function loadDb() {
     users: [],
     sessions: {},
     cards: [],
-    market: {},
+    market: {}
   };
 }
 
 let db = loadDb();
 
+if (!Array.isArray(db.users)) db.users = [];
+if (!db.sessions || typeof db.sessions !== "object") db.sessions = {};
+if (!Array.isArray(db.cards)) db.cards = [];
+if (!db.market || typeof db.market !== "object") db.market = {};
+
 function saveDb() {
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+  fs.writeFileSync(
+    DB_FILE,
+    JSON.stringify(db, null, 2)
+  );
 }
 
-if (!Array.isArray(db.users)) db.users = [];
-if (!Array.isArray(db.cards)) db.cards = [];
-if (!db.sessions) db.sessions = {};
-if (!db.market) db.market = {};
+const ADMIN_USER =
+  process.env.ADMIN_USER || "admin";
 
-const ADMIN_USER = process.env.ADMIN_USER || "admin";
-const ADMIN_PASS = process.env.ADMIN_PASS || "Admin@12345";
-console.log("ADMIN CONFIG:", ADMIN_USER, ADMIN_PASS);
+const ADMIN_PASS =
+  process.env.ADMIN_PASS || "Admin@12345";
+
 function hashPassword(password) {
-  return crypto.createHash("sha256").update(String(password)).digest("hex");
+  return crypto
+    .createHash("sha256")
+    .update(String(password))
+    .digest("hex");
 }
 
 function makeId() {
@@ -60,8 +68,17 @@ function makePlayerId() {
   let id;
 
   do {
-    id = String(Math.floor(1000000000 + Math.random() * 9000000000));
-  } while (db.users.some(u => u.playerId === id));
+    id = String(
+      Math.floor(
+        1000000000 +
+        Math.random() * 9000000000
+      )
+    );
+  } while (
+    db.users.some(
+      u => u.playerId === id
+    )
+  );
 
   return id;
 }
@@ -70,52 +87,115 @@ function cleanState(user) {
   return {
     id: user.id,
     username: user.username,
-    nickname: user.nickname,
-    playerId: user.playerId,
-    avatar: user.avatar || "",
-    title: user.title || "Tân binh",
 
-    coins: Number(user.coins || 0),
-    gems: Number(user.gems || 0),
-    tickets: Number(user.tickets || 0),
+    nickname:
+      user.nickname ||
+      user.username,
 
-    level: Number(user.level || 1),
-    xp: Number(user.xp || 0),
+    playerId:
+      user.playerId,
 
-    owned: Array.isArray(user.owned) ? user.owned.slice(0, 5000) : [],
+    avatar:
+      user.avatar ||
+      "⚽",
 
-    squad: Array.isArray(user.squad) ? user.squad : [],
-    formation: user.formation || "4-3-3",
+    title:
+      user.title ||
+      "Tân binh",
 
-    packCounts: user.packCounts || {
-      bronze: 0,
-      silver: 0,
-      gold: 0,
-      premium: 0
-    },
+    role:
+      user.isAdmin
+        ? "admin"
+        : "player",
 
-    mailbox: Array.isArray(user.mailbox) ? user.mailbox : [],
+    isAdmin:
+      !!user.isAdmin,
 
-    friends: Array.isArray(user.friends) ? user.friends : [],
-    friendRequests: Array.isArray(user.friendRequests)
-      ? user.friendRequests
-      : []
+    coins:
+      Number(user.coins || 0),
+
+    gems:
+      Number(user.gems || 0),
+
+    tickets:
+      Number(user.tickets || 0),
+
+    level:
+      Number(user.level || 1),
+
+    xp:
+      Number(user.xp || 0),
+
+    joinedAt:
+      user.joinedAt || "",
+
+    owned:
+      Array.isArray(user.owned)
+        ? user.owned.slice(0, 5000)
+        : [],
+
+    squad:
+      Array.isArray(user.squad)
+        ? user.squad.slice(0, 20)
+        : [],
+
+    formation:
+      user.formation ||
+      "4-3-3",
+
+    packCounts:
+      user.packCounts || {
+        bronze: 0,
+        silver: 0,
+        gold: 0,
+        premium: 0
+      },
+
+    mailbox:
+      Array.isArray(user.mailbox)
+        ? user.mailbox.slice(0, 500)
+        : [],
+
+    friends:
+      Array.isArray(user.friends)
+        ? user.friends
+        : [],
+
+    friendRequests:
+      Array.isArray(user.friendRequests)
+        ? user.friendRequests
+        : []
   };
 }
 
 function getUserFromToken(req) {
-  const token = req.headers.authorization?.replace("Bearer ", "");
+  const token =
+    req.headers.authorization?.replace(
+      /^Bearer\s+/i,
+      ""
+    );
 
   if (!token) return null;
 
-  const userId = db.sessions[token];
+  const userId =
+    db.sessions[token];
+
   if (!userId) return null;
 
-  return db.users.find(u => u.id === userId) || null;
+  return (
+    db.users.find(
+      u => u.id === userId
+    ) || null
+  );
 }
 
-function requireLogin(req, res, next) {
-  const user = getUserFromToken(req);
+function requireLogin(
+  req,
+  res,
+  next
+) {
+  const user =
+    getUserFromToken(req);
 
   if (!user) {
     return res.status(401).json({
@@ -128,13 +208,19 @@ function requireLogin(req, res, next) {
   next();
 }
 
-function requireAdmin(req, res, next) {
-  const user = getUserFromToken(req);
+function requireAdmin(
+  req,
+  res,
+  next
+) {
+  const user =
+    getUserFromToken(req);
 
   if (!user || !user.isAdmin) {
     return res.status(403).json({
       ok: false,
-      error: "Bạn không có quyền admin"
+      error:
+        "Bạn không có quyền admin"
     });
   }
 
@@ -142,9 +228,9 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-/* =========================
-   REAL PLAYER DATA
-========================= */
+/* =========================================================
+   PLAYER DATA
+========================================================= */
 
 const fallbackPlayers = [
   ["Lionel Messi", "Argentina", 91],
@@ -172,55 +258,130 @@ const fallbackPlayers = [
 function loadPlayers() {
   try {
     if (fs.existsSync(PLAYERS_FILE)) {
-      const data = JSON.parse(fs.readFileSync(PLAYERS_FILE, "utf8"));
+      const data =
+        JSON.parse(
+          fs.readFileSync(
+            PLAYERS_FILE,
+            "utf8"
+          )
+        );
 
-      if (Array.isArray(data) && data.length > 0) {
+      if (
+        Array.isArray(data) &&
+        data.length
+      ) {
         return data;
       }
     }
   } catch (e) {
-    console.error("players.json error:", e);
+    console.error(
+      "players.json error:",
+      e
+    );
   }
 
-  return fallbackPlayers.map(([name, nation, rating]) => ({
-    name,
-    nation,
-    rating
-  }));
+  return fallbackPlayers.map(
+    ([name, nation, rating]) => ({
+      name,
+      nation,
+      rating
+    })
+  );
 }
 
-function normalizePlayer(player, index) {
+function normalizePlayer(
+  player,
+  index
+) {
   if (Array.isArray(player)) {
     return {
-      id: String(index + 1),
-      name: player[0],
-      nation: player[1] || "",
-      rating: Number(player[2] || 70),
-      position: player[3] || "ST",
-      image: player[4] || ""
+      id:
+        String(index + 1),
+
+      name:
+        player[0],
+
+      nation:
+        player[1] || "",
+
+      rating:
+        Number(
+          player[2] || 70
+        ),
+
+      position:
+        player[3] || "ST",
+
+      image:
+        player[4] || ""
     };
   }
 
   return {
-    id: String(player.id || index + 1),
-    name: player.name || `Player ${index + 1}`,
-    nation: player.nation || player.country || "",
-    rating: Number(player.rating || player.ovr || 70),
-    position: player.position || "ST",
-    image: player.image || player.photo || ""
+    id:
+      String(
+        player.id ||
+        index + 1
+      ),
+
+    name:
+      player.name ||
+      `Player ${index + 1}`,
+
+    nation:
+      player.nation ||
+      player.country ||
+      "",
+
+    rating:
+      Number(
+        player.rating ||
+        player.ovr ||
+        70
+      ),
+
+    position:
+      player.position ||
+      "ST",
+
+    image:
+      player.image ||
+      player.photo ||
+      ""
   };
 }
 
-function rarityFromOvr(ovr, variant) {
-  if (variant >= 5) return "Icon";
-  if (ovr >= 90) return "Legendary";
-  if (ovr >= 86) return "Epic";
-  if (ovr >= 80) return "Rare";
+function rarityFromOvr(
+  ovr,
+  variant
+) {
+  if (variant >= 5)
+    return "Icon";
+
+  if (ovr >= 90)
+    return "Legendary";
+
+  if (ovr >= 86)
+    return "Epic";
+
+  if (ovr >= 80)
+    return "Rare";
+
   return "Common";
 }
 
-function makeStats(ovr, position) {
-  const base = Math.max(45, Math.min(95, ovr));
+function makeStats(
+  ovr,
+  position
+) {
+  const base =
+    Math.max(
+      45,
+      Math.min(
+        95,
+        ovr
+      )
+    );
 
   let pac = base;
   let sho = base;
@@ -229,23 +390,34 @@ function makeStats(ovr, position) {
   let def = base;
   let phy = base;
 
-  if (["ST", "CF", "LW", "RW"].includes(position)) {
+  if (
+    ["ST", "CF", "LW", "RW"]
+      .includes(position)
+  ) {
     pac += 3;
     sho += 4;
     dri += 3;
   }
 
-  if (["CM", "CAM", "CDM"].includes(position)) {
+  if (
+    ["CM", "CAM", "CDM"]
+      .includes(position)
+  ) {
     pas += 5;
     dri += 3;
   }
 
-  if (["CB", "LB", "RB"].includes(position)) {
+  if (
+    ["CB", "LB", "RB"]
+      .includes(position)
+  ) {
     def += 6;
     phy += 3;
   }
 
-  if (position === "GK") {
+  if (
+    position === "GK"
+  ) {
     pac -= 20;
     sho -= 40;
     pas -= 5;
@@ -255,729 +427,2277 @@ function makeStats(ovr, position) {
   }
 
   return {
-    PAC: Math.min(99, Math.max(1, Math.round(pac))),
-    SHO: Math.min(99, Math.max(1, Math.round(sho))),
-    PAS: Math.min(99, Math.max(1, Math.round(pas))),
-    DRI: Math.min(99, Math.max(1, Math.round(dri))),
-    DEF: Math.min(99, Math.max(1, Math.round(def))),
-    PHY: Math.min(99, Math.max(1, Math.round(phy)))
+    PAC: Math.min(
+      99,
+      Math.max(
+        1,
+        Math.round(pac)
+      )
+    ),
+
+    SHO: Math.min(
+      99,
+      Math.max(
+        1,
+        Math.round(sho)
+      )
+    ),
+
+    PAS: Math.min(
+      99,
+      Math.max(
+        1,
+        Math.round(pas)
+      )
+    ),
+
+    DRI: Math.min(
+      99,
+      Math.max(
+        1,
+        Math.round(dri)
+      )
+    ),
+
+    DEF: Math.min(
+      99,
+      Math.max(
+        1,
+        Math.round(def)
+      )
+    ),
+
+    PHY: Math.min(
+      99,
+      Math.max(
+        1,
+        Math.round(phy)
+      )
+    )
   };
 }
 
-function makeCard(player, variant) {
-  const ovr = Math.min(
-    99,
-    Number(player.rating || 70) + (variant >= 5 ? 2 : variant - 1)
-  );
+function makeCard(
+  player,
+  variant
+) {
+  const ovr =
+    Math.min(
+      99,
+      Number(
+        player.rating || 70
+      ) +
+      (
+        variant >= 5
+          ? 2
+          : variant - 1
+      )
+    );
 
   return {
-    id: `${player.id}-${variant}`,
-    playerId: String(player.id),
-    name: player.name,
-    nation: player.nation,
-    position: player.position || "ST",
-    rating: ovr,
-    rarity: rarityFromOvr(ovr, variant),
+    id:
+      `${player.id}-${variant}`,
+
+    playerId:
+      String(player.id),
+
+    name:
+      player.name,
+
+    nation:
+      player.nation,
+
+    position:
+      player.position ||
+      "ST",
+
+    rating:
+      ovr,
+
+    rarity:
+      rarityFromOvr(
+        ovr,
+        variant
+      ),
+
     variant,
-    image: player.image || "",
-    stats: makeStats(ovr, player.position || "ST")
+
+    image:
+      player.image || "",
+
+    stats:
+      makeStats(
+        ovr,
+        player.position ||
+        "ST"
+      )
   };
 }
 
 function generateCardCatalog() {
-  const players = loadPlayers().map(normalizePlayer);
+  const basePlayers =
+    loadPlayers()
+      .map(normalizePlayer);
 
   const cards = [];
 
-  for (const player of players) {
-    for (let variant = 1; variant <= 5; variant++) {
-      cards.push(makeCard(player, variant));
+  for (
+    const player of basePlayers
+  ) {
+    for (
+      let variant = 1;
+      variant <= 5;
+      variant++
+    ) {
+      cards.push(
+        makeCard(
+          player,
+          variant
+        )
+      );
     }
   }
 
   db.cards = cards;
+
   saveDb();
 
   return cards;
 }
 
-if (!Array.isArray(db.cards) || db.cards.length === 0) {
+if (!db.cards.length) {
   generateCardCatalog();
 }
 
-console.log(`Loaded ${db.cards.length} cards`);
+/* =========================================================
+   USER SHAPE
+========================================================= */
 
-/* =========================
-   HEALTH
-========================= */
-
-app.get("/", (req, res) => {
-  res.json({
-    ok: true,
-    message: "FOOTBALL LEGENDS SERVER",
-    cards: db.cards.length,
-    players: Math.floor(db.cards.length / 5)
-  });
-});
-
-app.get("/api/health", (req, res) => {
-  res.json({
-    ok: true,
-    cards: db.cards.length,
-    players: Math.floor(db.cards.length / 5),
-    users: db.users.length
-  });
-});
-
-/* =========================
-   REGISTER
-========================= */
-
-app.post("/api/register", (req, res) => {
-  const { username, password, nickname } = req.body;
-
-  if (!username || !password) {
-    return res.status(400).json({
-      ok: false,
-      error: "Thiếu tài khoản hoặc mật khẩu"
-    });
+function ensureUserShape(
+  user
+) {
+  if (!user.playerId) {
+    user.playerId =
+      makePlayerId();
   }
 
-  if (db.users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
-    return res.status(400).json({
-      ok: false,
-      error: "Tài khoản đã tồn tại"
-    });
+  if (!user.avatar) {
+    user.avatar = "⚽";
   }
 
-  const user = {
-    id: makeId(),
-    username,
-    passwordHash: hashPassword(password),
-    nickname: nickname || username,
-    playerId: makePlayerId(),
+  if (!user.title) {
+    user.title =
+      user.isAdmin
+        ? "ADMIN"
+        : "Tân binh";
+  }
 
-    avatar: "",
-    title: "Tân binh",
+  if (
+    !Array.isArray(
+      user.owned
+    )
+  ) {
+    user.owned = [];
+  }
 
-    coins: 10000,
-    gems: 100,
-    tickets: 5,
+  if (
+    !Array.isArray(
+      user.squad
+    )
+  ) {
+    user.squad = [];
+  }
 
-    level: 1,
-    xp: 0,
+  if (!user.formation) {
+    user.formation =
+      "4-3-3";
+  }
 
-    owned: [],
-    squad: [],
-    formation: "4-3-3",
-
-    packCounts: {
-      bronze: 3,
-      silver: 1,
+  if (
+    !user.packCounts
+  ) {
+    user.packCounts = {
+      bronze: 0,
+      silver: 0,
       gold: 0,
       premium: 0
-    },
+    };
+  }
 
-    mailbox: [],
-    friends: [],
-    friendRequests: [],
+  if (
+    !Array.isArray(
+      user.mailbox
+    )
+  ) {
+    user.mailbox = [];
+  }
 
-    isAdmin: username === ADMIN_USER
-  };
+  if (
+    !Array.isArray(
+      user.friends
+    )
+  ) {
+    user.friends = [];
+  }
 
-  db.users.push(user);
-  saveDb();
+  if (
+    !Array.isArray(
+      user.friendRequests
+    )
+  ) {
+    user.friendRequests = [];
+  }
 
-  res.json({
-    ok: true,
-    user: cleanState(user)
-  });
-});
+  if (
+    !Number.isFinite(
+      Number(user.coins)
+    )
+  ) {
+    user.coins = 0;
+  }
 
-/* =========================
-   LOGIN
-========================= */
+  if (
+    !Number.isFinite(
+      Number(user.gems)
+    )
+  ) {
+    user.gems = 0;
+  }
 
-app.post("/api/login", (req, res) => {
-  const { username, password } = req.body;
-  console.log("LOGIN CHECK:", {
-  username: String(username || ""),
-  isAdminUser: String(username || "").toLowerCase() === String(ADMIN_USER).toLowerCase(),
-  isAdminPassword: String(password || "") === String(ADMIN_PASS)
-});
+  if (
+    !Number.isFinite(
+      Number(user.tickets)
+    )
+  ) {
+    user.tickets = 0;
+  }
 
-  const inputUsername = String(username || "").trim();
-const inputPassword = String(password || "");
+  if (
+    !Number.isFinite(
+      Number(user.level)
+    )
+  ) {
+    user.level = 1;
+  }
 
-let user = db.users.find(
-  u => u.username.toLowerCase() === inputUsername.toLowerCase()
+  if (
+    !Number.isFinite(
+      Number(user.xp)
+    )
+  ) {
+    user.xp = 0;
+  }
+}
+
+for (
+  const user of db.users
+) {
+  ensureUserShape(user);
+}
+
+/* =========================================================
+   HEALTH
+========================================================= */
+
+app.get(
+  "/",
+  (req, res) => {
+    res.json({
+      ok: true,
+      message:
+        "FOOTBALL LEGENDS SERVER",
+      cards:
+        db.cards.length,
+      players:
+        Math.floor(
+          db.cards.length / 5
+        )
+    });
+  }
 );
 
-if (
-  inputUsername.toLowerCase() === String(ADMIN_USER).toLowerCase() &&
-  inputPassword === String(ADMIN_PASS)
-) {
-  if (!user) {
-    user = {
-      id: makeId(),
-      username: ADMIN_USER,
-      passwordHash: hashPassword(ADMIN_PASS),
-      isAdmin: true,
-      role: "admin"
+app.get(
+  "/api/health",
+  (req, res) => {
+    res.json({
+      ok: true,
+      cards:
+        db.cards.length,
+      players:
+        Math.floor(
+          db.cards.length / 5
+        ),
+      users:
+        db.users.length
+    });
+  }
+);
+
+/* =========================================================
+   REGISTER
+========================================================= */
+
+app.post(
+  "/api/register",
+  (req, res) => {
+
+    const username =
+      String(
+        req.body.username ||
+        ""
+      ).trim();
+
+    const password =
+      String(
+        req.body.password ||
+        ""
+      );
+
+    const nickname =
+      String(
+        req.body.nickname ||
+        username
+      ).trim() ||
+      username;
+
+    if (
+      !/^[A-Za-z0-9_]{3,24}$/
+        .test(username)
+    ) {
+      return res
+        .status(400)
+        .json({
+          ok: false,
+          error:
+            "Tài khoản 3-24 ký tự, chỉ chữ/số/_"
+        });
+    }
+
+    if (
+      password.length < 6
+    ) {
+      return res
+        .status(400)
+        .json({
+          ok: false,
+          error:
+            "Mật khẩu tối thiểu 6 ký tự"
+        });
+    }
+
+    if (
+      db.users.some(
+        u =>
+          String(
+            u.username
+          ).toLowerCase() ===
+          username.toLowerCase()
+      )
+    ) {
+      return res
+        .status(400)
+        .json({
+          ok: false,
+          error:
+            "Tài khoản đã tồn tại"
+        });
+    }
+
+    const user = {
+
+      id:
+        makeId(),
+
+      username,
+
+      passwordHash:
+        hashPassword(
+          password
+        ),
+
+      nickname,
+
+      playerId:
+        makePlayerId(),
+
+      avatar:
+        "⚽",
+
+      title:
+        username.toLowerCase() ===
+        ADMIN_USER.toLowerCase()
+          ? "ADMIN"
+          : "Tân binh",
+
+      coins:
+        10000,
+
+      gems:
+        100,
+
+      tickets:
+        5,
+
+      level:
+        1,
+
+      xp:
+        0,
+
+      joinedAt:
+        new Date().toISOString(),
+
+      owned: [],
+
+      squad: [],
+
+      formation:
+        "4-3-3",
+
+      packCounts: {
+        bronze: 3,
+        silver: 1,
+        gold: 0,
+        premium: 0
+      },
+
+      mailbox: [],
+
+      friends: [],
+
+      friendRequests: [],
+
+      isAdmin:
+        username.toLowerCase() ===
+        ADMIN_USER.toLowerCase()
     };
 
     db.users.push(user);
-  } else {
-  user.username = ADMIN_USER;
-  user.passwordHash = hashPassword(ADMIN_PASS);
-  user.isAdmin = true;
-  user.role = "admin";
-}
 
-  saveDb();
-}
+    saveDb();
 
-if (!user || user.passwordHash !== hashPassword(inputPassword)) {
- 
-    return res.status(401).json({
-      ok: false,
-      error: "Sai tài khoản hoặc mật khẩu"
+    res.json({
+      ok: true,
+      user:
+        cleanState(user)
     });
+
   }
-
-  const token = makeId();
-  db.sessions[token] = user.id;
-
-  saveDb();
-
-  res.json({
-    ok: true,
-    token,
-    user: cleanState(user)
-  });
-});
-
-/* =========================
-   LOGOUT
-========================= */
-
-app.post("/api/logout", requireLogin, (req, res) => {
-  const token = req.headers.authorization?.replace("Bearer ", "");
-
-  delete db.sessions[token];
-
-  saveDb();
-
-  res.json({ ok: true });
-});
-
-/* =========================
-   ME
-========================= */
-
-app.get("/api/me", requireLogin, (req, res) => {
-  res.json({
-    ok: true,
-    user: cleanState(req.user)
-  });
-});
-
-/* =========================
-   STATE
-========================= */
-
-app.get("/api/state", requireLogin, (req, res) => {
-  res.json({
-    ok: true,
-    user: cleanState(req.user)
-  });
-});
-
-/* =========================
-   PLAYER SEARCH
-========================= */
-
-app.get("/api/users/:playerId", requireLogin, (req, res) => {
-  const target = db.users.find(
-    u => u.playerId === String(req.params.playerId)
-  );
-
-  if (!target) {
-    return res.status(404).json({
-      ok: false,
-      error: "Không tìm thấy người chơi"
-    });
-  }
-
-  res.json({
-    ok: true,
-    user: {
-      playerId: target.playerId,
-      username: target.username,
-      nickname: target.nickname,
-      avatar: target.avatar || "",
-      title: target.title || "Tân binh",
-      level: target.level || 1
-    }
-  });
-});
-
-/* =========================
-   FRIEND REQUEST
-========================= */
-
-app.post("/api/friends/request", requireLogin, (req, res) => {
-  const { playerId } = req.body;
-
-  const target = db.users.find(
-    u => u.playerId === String(playerId)
-  );
-
-  if (!target) {
-    return res.status(404).json({
-      ok: false,
-      error: "Không tìm thấy người chơi"
-    });
-  }
-
-  if (target.id === req.user.id) {
-    return res.status(400).json({
-      ok: false,
-      error: "Không thể kết bạn với chính mình"
-    });
-  }
-
-  if (!Array.isArray(target.friendRequests)) {
-    target.friendRequests = [];
-  }
-
-  if (!target.friendRequests.includes(req.user.id)) {
-    target.friendRequests.push(req.user.id);
-  }
-
-  saveDb();
-
-  res.json({ ok: true });
-});
-
-/* =========================
-   FRIEND ACCEPT
-========================= */
-
-app.post("/api/friends/accept", requireLogin, (req, res) => {
-  const { userId } = req.body;
-
-  if (!req.user.friendRequests.includes(userId)) {
-    return res.status(400).json({
-      ok: false,
-      error: "Không có lời mời này"
-    });
-  }
-
-  const target = db.users.find(u => u.id === userId);
-
-  if (!target) {
-    return res.status(404).json({
-      ok: false,
-      error: "Không tìm thấy người chơi"
-    });
-  }
-
-  req.user.friendRequests =
-    req.user.friendRequests.filter(id => id !== userId);
-
-  if (!req.user.friends.includes(userId)) {
-    req.user.friends.push(userId);
-  }
-
-  if (!target.friends.includes(req.user.id)) {
-    target.friends.push(req.user.id);
-  }
-
-  saveDb();
-
-  res.json({
-    ok: true,
-    user: cleanState(req.user)
-  });
-});
-
-/* =========================
-   CARDS
-========================= */
-
-app.get("/api/cards", (req, res) => {
-  res.json({
-    ok: true,
-    count: db.cards.length,
-    cards: db.cards
-  });
-});
-
-app.get("/api/cards/:cardId", (req, res) => {
-  const card = db.cards.find(c => c.id === req.params.cardId);
-
-  if (!card) {
-    return res.status(404).json({
-      ok: false,
-      error: "Không tìm thấy thẻ"
-    });
-  }
-
-  res.json({
-    ok: true,
-    card
-  });
-});
-
-app.get("/api/cards/stats", (req, res) => {
-  const stats = {};
-
-  for (const card of db.cards) {
-    stats[card.rarity] = (stats[card.rarity] || 0) + 1;
-  }
-
-  res.json({
-    ok: true,
-    total: db.cards.length,
-    rarities: stats
-  });
-});
-
-/* =========================
-   COLLECTION
-========================= */
-
-app.get("/api/collection", requireLogin, (req, res) => {
-  const collection = req.user.owned
-    .map(id => db.cards.find(c => c.id === id))
-    .filter(Boolean);
-
-  res.json({
-    ok: true,
-    count: collection.length,
-    cards: collection
-  });
-});
-
-/* =========================
-   PACK OPEN
-========================= */
-
-function chooseRarity() {
-  const r = Math.random();
-
-  if (r < 0.02) return "Icon";
-  if (r < 0.08) return "Legendary";
-  if (r < 0.25) return "Epic";
-  if (r < 0.60) return "Rare";
-
-  return "Common";
-}
-
-app.post("/api/packs/open", requireLogin, (req, res) => {
-  const pack = req.body.pack || "bronze";
-
-  const prices = {
-    bronze: 1000,
-    silver: 2500,
-    gold: 5000,
-    premium: 10000
-  };
-
-  const price = prices[pack];
-
-  if (!price) {
-    return res.status(400).json({
-      ok: false,
-      error: "Loại pack không hợp lệ"
-    });
-  }
-
-  if (req.user.coins < price) {
-    return res.status(400).json({
-      ok: false,
-      error: "Không đủ xu"
-    });
-  }
-
-  req.user.coins -= price;
-
-  let possible = db.cards.filter(
-    c => c.rarity === chooseRarity()
-  );
-
-  if (possible.length === 0) {
-    possible = db.cards;
-  }
-
-  const card = possible[
-    Math.floor(Math.random() * possible.length)
-  ];
-
-  req.user.owned.push(card.id);
-
-  saveDb();
-
-  res.json({
-    ok: true,
-    card,
-    user: cleanState(req.user)
-  });
-});
-
-/* =========================
-   GIFTS
-========================= */
-
-app.post("/api/gifts", requireLogin, (req, res) => {
-  const { playerId, type, amount } = req.body;
-
-  const target = db.users.find(
-    u => u.playerId === String(playerId)
-  );
-
-  if (!target) {
-    return res.status(404).json({
-      ok: false,
-      error: "Không tìm thấy người nhận"
-    });
-  }
-
-  const value = Math.max(1, Number(amount || 1));
-
-  if (type === "coins") {
-    if (req.user.coins < value) {
-      return res.status(400).json({
-        ok: false,
-        error: "Không đủ xu"
-      });
-    }
-
-    req.user.coins -= value;
-    target.coins += value;
-  }
-
-  else if (type === "gems") {
-    if (req.user.gems < value) {
-      return res.status(400).json({
-        ok: false,
-        error: "Không đủ Gems"
-      });
-    }
-
-    req.user.gems -= value;
-    target.gems += value;
-  }
-
-  else {
-    return res.status(400).json({
-      ok: false,
-      error: "Loại quà không hợp lệ"
-    });
-  }
-
-  saveDb();
-
-  res.json({
-    ok: true,
-    user: cleanState(req.user)
-  });
-});
-
-/* =========================
-   MAILBOX
-========================= */
-
-app.post("/api/mail/claim", requireLogin, (req, res) => {
-  const { mailId } = req.body;
-
-  const index = req.user.mailbox.findIndex(
-    m => m.id === mailId
-  );
-
-  if (index === -1) {
-    return res.status(404).json({
-      ok: false,
-      error: "Không tìm thấy thư"
-    });
-  }
-
-  const mail = req.user.mailbox[index];
-
-  if (mail.coins) req.user.coins += Number(mail.coins);
-  if (mail.gems) req.user.gems += Number(mail.gems);
-  if (mail.tickets) req.user.tickets += Number(mail.tickets);
-
-  if (mail.cardId) {
-    req.user.owned.push(mail.cardId);
-  }
-
-  req.user.mailbox.splice(index, 1);
-
-  saveDb();
-
-  res.json({
-    ok: true,
-    user: cleanState(req.user)
-  });
-});
-
-/* =========================
-   MARKET
-========================= */
-
-app.get("/api/market", (req, res) => {
-  res.json({
-    ok: true,
-    prices: db.market
-  });
-});
-
-/* =========================
-   ADMIN
-========================= */
-
-app.post("/api/admin/grant", requireAdmin, (req, res) => {
-  const {
-    playerId,
-    coins = 0,
-    gems = 0,
-    tickets = 0,
-    pack,
-    packAmount = 1
-  } = req.body;
-
-  const target = db.users.find(
-    u => u.playerId === String(playerId)
-  );
-
-  if (!target) {
-    return res.status(404).json({
-      ok: false,
-      error: "Không tìm thấy người chơi"
-    });
-  }
-
-  target.coins += Number(coins || 0);
-  target.gems += Number(gems || 0);
-  target.tickets += Number(tickets || 0);
-
-  if (pack) {
-    if (!target.packCounts) {
-      target.packCounts = {};
-    }
-
-    target.packCounts[pack] =
-      Number(target.packCounts[pack] || 0) +
-      Number(packAmount || 1);
-  }
-
-  saveDb();
-
-  res.json({
-    ok: true,
-    user: cleanState(target)
-  });
-});
-
-app.post("/api/admin/price", requireAdmin, (req, res) => {
-  const { item, price } = req.body;
-
-  db.market[item] = Number(price || 0);
-
-  saveDb();
-
-  res.json({
-    ok: true,
-    prices: db.market
-  });
-});
-
-app.get("/api/admin/users", requireAdmin, (req, res) => {
-  res.json({
-    ok: true,
-    users: db.users.map(u => ({
-      playerId: u.playerId,
-      username: u.username,
-      nickname: u.nickname,
-      coins: u.coins,
-      gems: u.gems,
-      level: u.level,
-      cards: u.owned?.length || 0,
-      isAdmin: !!u.isAdmin
-    }))
-  });
-});
-
-/* =========================
-   REGENERATE CARDS
-========================= */
-
-app.post("/api/admin/cards/generate", requireAdmin, (req, res) => {
-  const cards = generateCardCatalog();
-
-  res.json({
-    ok: true,
-    message: "Đã tạo lại hệ thống thẻ",
-    cards: cards.length,
-    players: Math.floor(cards.length / 5)
-  });
-});
-
-/* =========================
-   CREATE DEFAULT ADMIN
-========================= */
-
-let admin = db.users.find(
-  u => String(u.username).toLowerCase() === String(ADMIN_USER).toLowerCase()
 );
 
+/* =========================================================
+   LOGIN
+========================================================= */
+
+app.post(
+  "/api/login",
+  (req, res) => {
+
+    const username =
+      String(
+        req.body.username ||
+        ""
+      ).trim();
+
+    const password =
+      String(
+        req.body.password ||
+        ""
+      );
+
+    let user =
+      db.users.find(
+        u =>
+          String(
+            u.username
+          ).toLowerCase() ===
+          username.toLowerCase()
+      );
+
+    if (
+      username.toLowerCase() ===
+        ADMIN_USER.toLowerCase() &&
+      password ===
+        ADMIN_PASS
+    ) {
+
+      if (!user) {
+
+        user = {
+
+          id:
+            makeId(),
+
+          username:
+            ADMIN_USER,
+
+          passwordHash:
+            hashPassword(
+              ADMIN_PASS
+            ),
+
+          nickname:
+            "ADMIN",
+
+          playerId:
+            makePlayerId(),
+
+          avatar:
+            "👑",
+
+          title:
+            "ADMIN",
+
+          coins:
+            999999999,
+
+          gems:
+            999999,
+
+          tickets:
+            99999,
+
+          level:
+            100,
+
+          xp:
+            0,
+
+          joinedAt:
+            new Date().toISOString(),
+
+          owned: [],
+
+          squad: [],
+
+          formation:
+            "4-3-3",
+
+          packCounts: {
+            bronze: 999,
+            silver: 999,
+            gold: 999,
+            premium: 999
+          },
+
+          mailbox: [],
+
+          friends: [],
+
+          friendRequests: [],
+
+          isAdmin:
+            true
+
+        };
+
+        db.users.push(
+          user
+        );
+
+      } else {
+
+        user.username =
+          ADMIN_USER;
+
+        user.passwordHash =
+          hashPassword(
+            ADMIN_PASS
+          );
+
+        user.isAdmin =
+          true;
+
+        user.nickname =
+          "ADMIN";
+
+        user.title =
+          "ADMIN";
+      }
+
+      ensureUserShape(
+        user
+      );
+    }
+
+    if (
+      !user ||
+      user.passwordHash !==
+        hashPassword(
+          password
+        )
+    ) {
+
+      return res
+        .status(401)
+        .json({
+          ok: false,
+          error:
+            "Sai tài khoản hoặc mật khẩu"
+        });
+
+    }
+
+    ensureUserShape(
+      user
+    );
+
+    const token =
+      makeId();
+
+    db.sessions[token] =
+      user.id;
+
+    saveDb();
+
+    res.json({
+      ok: true,
+      token,
+      user:
+        cleanState(user)
+    });
+
+  }
+);
+
+/* =========================================================
+   LOGOUT
+========================================================= */
+
+app.post(
+  "/api/logout",
+  requireLogin,
+  (req, res) => {
+
+    const token =
+      req.headers.authorization
+        ?.replace(
+          /^Bearer\s+/i,
+          ""
+        );
+
+    if (token) {
+      delete db.sessions[
+        token
+      ];
+    }
+
+    saveDb();
+
+    res.json({
+      ok: true
+    });
+
+  }
+);
+
+/* =========================================================
+   ME
+========================================================= */
+
+app.get(
+  "/api/me",
+  requireLogin,
+  (req, res) => {
+
+    res.json({
+      ok: true,
+      user:
+        cleanState(
+          req.user
+        )
+    });
+
+  }
+);
+
+/* =========================================================
+   STATE
+========================================================= */
+
+app.get(
+  "/api/state",
+  requireLogin,
+  (req, res) => {
+
+    res.json({
+      ok: true,
+      user:
+        cleanState(
+          req.user
+        )
+    });
+
+  }
+);
+
+app.put(
+  "/api/state",
+  requireLogin,
+  (req, res) => {
+
+    const state =
+      req.body?.state ||
+      {};
+
+    const user =
+      req.user;
+
+    if (
+      state.coins !==
+      undefined
+    ) {
+      user.coins =
+        Math.max(
+          0,
+          Math.floor(
+            Number(
+              state.coins
+            ) || 0
+          )
+        );
+    }
+
+    if (
+      state.gems !==
+      undefined
+    ) {
+      user.gems =
+        Math.max(
+          0,
+          Math.floor(
+            Number(
+              state.gems
+            ) || 0
+          )
+        );
+    }
+
+    if (
+      state.tickets !==
+      undefined
+    ) {
+      user.tickets =
+        Math.max(
+          0,
+          Math.floor(
+            Number(
+              state.tickets
+            ) || 0
+          )
+        );
+    }
+
+    if (
+      Array.isArray(
+        state.owned
+      )
+    ) {
+      user.owned =
+        state.owned.slice(
+          0,
+          5000
+        );
+    }
+
+    if (
+      Array.isArray(
+        state.squad
+      )
+    ) {
+      user.squad =
+        state.squad.slice(
+          0,
+          20
+        );
+    }
+
+    if (
+      typeof state.formation ===
+      "string"
+    ) {
+      user.formation =
+        state.formation;
+    }
+
+    if (
+      state.packCounts &&
+      typeof
+        state.packCounts ===
+        "object"
+    ) {
+      user.packCounts = {
+        ...user.packCounts,
+        ...state.packCounts
+      };
+    }
+
+    if (
+      Number.isFinite(
+        Number(
+          state.level
+        )
+      )
+    ) {
+      user.level =
+        Math.max(
+          1,
+          Math.floor(
+            Number(
+              state.level
+            )
+          )
+        );
+    }
+
+    if (
+      Number.isFinite(
+        Number(
+          state.xp
+        )
+      )
+    ) {
+      user.xp =
+        Math.max(
+          0,
+          Math.floor(
+            Number(
+              state.xp
+            )
+          )
+        );
+    }
+
+    if (
+      typeof state.avatar ===
+      "string" &&
+      state.avatar.length <= 8
+    ) {
+      user.avatar =
+        state.avatar;
+    }
+
+    ensureUserShape(
+      user
+    );
+
+    saveDb();
+
+    res.json({
+      ok: true,
+      user:
+        cleanState(
+          user
+        )
+    });
+
+  }
+);
+
+/* =========================================================
+   USER SEARCH
+========================================================= */
+
+app.get(
+  "/api/users/:playerId",
+  requireLogin,
+  (req, res) => {
+
+    const target =
+      db.users.find(
+        u =>
+          u.playerId ===
+          String(
+            req.params.playerId
+          )
+      );
+
+    if (!target) {
+
+      return res
+        .status(404)
+        .json({
+          ok: false,
+          error:
+            "Không tìm thấy người chơi"
+        });
+
+    }
+
+    res.json({
+      ok: true,
+      user: {
+
+        playerId:
+          target.playerId,
+
+        username:
+          target.username,
+
+        nickname:
+          target.nickname,
+
+        avatar:
+          target.avatar ||
+          "⚽",
+
+        title:
+          target.title ||
+          "Tân binh",
+
+        level:
+          target.level ||
+          1
+      }
+    });
+
+  }
+);
+
+/* =========================================================
+   FRIENDS
+========================================================= */
+
+app.get(
+  "/api/friends",
+  requireLogin,
+  (req, res) => {
+
+    const friendUsers =
+      req.user.friends
+        .map(
+          id =>
+            db.users.find(
+              u =>
+                u.id === id
+            )
+        )
+        .filter(Boolean)
+        .map(
+          u => ({
+            playerId:
+              u.playerId,
+
+            username:
+              u.username,
+
+            nickname:
+              u.nickname,
+
+            avatar:
+              u.avatar,
+
+            title:
+              u.title,
+
+            level:
+              u.level
+          })
+        );
+
+    const requests =
+      req.user.friendRequests
+        .map(
+          id =>
+            db.users.find(
+              u =>
+                u.id === id
+            )
+        )
+        .filter(Boolean)
+        .map(
+          u => ({
+            id:
+              u.id,
+
+            playerId:
+              u.playerId,
+
+            username:
+              u.username,
+
+            nickname:
+              u.nickname,
+
+            avatar:
+              u.avatar,
+
+            title:
+              u.title,
+
+            level:
+              u.level
+          })
+        );
+
+    res.json({
+      ok: true,
+      friends:
+        friendUsers,
+      requests
+    });
+
+  }
+);
+
+app.post(
+  "/api/friends/request",
+  requireLogin,
+  (req, res) => {
+
+    const playerId =
+      String(
+        req.body.playerId ||
+        ""
+      );
+
+    const target =
+      db.users.find(
+        u =>
+          u.playerId ===
+          playerId
+      );
+
+    if (!target) {
+
+      return res
+        .status(404)
+        .json({
+          ok: false,
+          error:
+            "Không tìm thấy người chơi"
+        });
+
+    }
+
+    if (
+      target.id ===
+      req.user.id
+    ) {
+
+      return res
+        .status(400)
+        .json({
+          ok: false,
+          error:
+            "Không thể kết bạn với chính mình"
+        });
+
+    }
+
+    if (
+      !Array.isArray(
+        target.friendRequests
+      )
+    ) {
+      target.friendRequests =
+        [];
+    }
+
+    if (
+      !target.friendRequests.includes(
+        req.user.id
+      )
+    ) {
+      target.friendRequests.push(
+        req.user.id
+      );
+    }
+
+    saveDb();
+
+    res.json({
+      ok: true
+    });
+
+  }
+);
+
+app.post(
+  "/api/friends/accept",
+  requireLogin,
+  (req, res) => {
+
+    const userId =
+      String(
+        req.body.userId ||
+        ""
+      );
+
+    if (
+      !req.user.friendRequests.includes(
+        userId
+      )
+    ) {
+
+      return res
+        .status(400)
+        .json({
+          ok: false,
+          error:
+            "Không có lời mời này"
+        });
+
+    }
+
+    const target =
+      db.users.find(
+        u =>
+          u.id ===
+          userId
+      );
+
+    if (!target) {
+
+      return res
+        .status(404)
+        .json({
+          ok: false,
+          error:
+            "Không tìm thấy người chơi"
+        });
+
+    }
+
+    req.user.friendRequests =
+      req.user.friendRequests.filter(
+        id =>
+          id !== userId
+      );
+
+    if (
+      !req.user.friends.includes(
+        userId
+      )
+    ) {
+      req.user.friends.push(
+        userId
+      );
+    }
+
+    if (
+      !target.friends.includes(
+        req.user.id
+      )
+    ) {
+      target.friends.push(
+        req.user.id
+      );
+    }
+
+    saveDb();
+
+    res.json({
+      ok: true,
+      user:
+        cleanState(
+          req.user
+        )
+    });
+
+  }
+);
+
+/* =========================================================
+   CARDS
+========================================================= */
+
+app.get(
+  "/api/cards",
+  (req, res) => {
+
+    res.json({
+      ok: true,
+      count:
+        db.cards.length,
+      cards:
+        db.cards
+    });
+
+  }
+);
+
+app.get(
+  "/api/collection",
+  requireLogin,
+  (req, res) => {
+
+    const collection =
+      req.user.owned
+        .map(
+          id =>
+            db.cards.find(
+              c =>
+                c.id === id
+            )
+        )
+        .filter(Boolean);
+
+    res.json({
+      ok: true,
+      count:
+        collection.length,
+      cards:
+        collection
+    });
+
+  }
+);
+
+/* =========================================================
+   PACK
+========================================================= */
+
+function packPrice(
+  pack
+) {
+  return (
+    {
+      bronze: 5000,
+      silver: 15000,
+      gold: 50000,
+      premium: 150000
+    }[pack] || 0
+  );
+}
+
+function allowedRarities(
+  pack
+) {
+
+  if (
+    pack === "premium"
+  ) {
+    return [
+      "Legendary",
+      "Icon",
+      "Epic",
+      "Rare"
+    ];
+  }
+
+  if (
+    pack === "gold"
+  ) {
+    return [
+      "Legendary",
+      "Epic",
+      "Rare"
+    ];
+  }
+
+  if (
+    pack === "silver"
+  ) {
+    return [
+      "Epic",
+      "Rare",
+      "Common"
+    ];
+  }
+
+  return [
+    "Rare",
+    "Common"
+  ];
+}
+
+function choosePackCard(
+  pack
+) {
+
+  const allowed =
+    allowedRarities(
+      pack
+    );
+
+  let pool =
+    db.cards.filter(
+      c =>
+        allowed.includes(
+          c.rarity
+        )
+    );
+
+  if (!pool.length) {
+    pool = db.cards;
+  }
+
+  return pool[
+    Math.floor(
+      Math.random() *
+      pool.length
+    )
+  ];
+}
+
+app.post(
+  "/api/packs/open",
+  requireLogin,
+  (req, res) => {
+
+    const pack =
+      String(
+        req.body.pack ||
+        "bronze"
+      );
+
+    const price =
+      packPrice(
+        pack
+      );
+
+    if (!price) {
+
+      return res
+        .status(400)
+        .json({
+          ok: false,
+          error:
+            "Loại pack không hợp lệ"
+        });
+
+    }
+
+    ensureUserShape(
+      req.user
+    );
+
+    const free =
+      Number(
+        req.user.packCounts[
+          pack
+        ] || 0
+      );
+
+    if (free > 0) {
+
+      req.user.packCounts[
+        pack
+      ] =
+        free - 1;
+
+    } else {
+
+      if (
+        req.user.coins <
+        price
+      ) {
+
+        return res
+          .status(400)
+          .json({
+            ok: false,
+            error:
+              "Không đủ xu"
+          });
+
+      }
+
+      req.user.coins -=
+        price;
+    }
+
+    const cards = [];
+
+    for (
+      let i = 0;
+      i < 5;
+      i++
+    ) {
+
+      const card =
+        choosePackCard(
+          pack
+        );
+
+      cards.push(
+        card
+      );
+
+      req.user.owned.push(
+        card.id
+      );
+
+    }
+
+    saveDb();
+
+    res.json({
+      ok: true,
+      cards,
+      user:
+        cleanState(
+          req.user
+        )
+    });
+
+  }
+);
+
+/* =========================================================
+   GIFTS
+========================================================= */
+
+app.post(
+  "/api/gifts",
+  requireLogin,
+  (req, res) => {
+
+    const playerId =
+      String(
+        req.body.playerId ||
+        ""
+      );
+
+    const type =
+      String(
+        req.body.type ||
+        ""
+      );
+
+    const amount =
+      Math.max(
+        1,
+        Math.floor(
+          Number(
+            req.body.amount ||
+            1
+          )
+        )
+      );
+
+    const target =
+      db.users.find(
+        u =>
+          u.playerId ===
+          playerId
+      );
+
+    if (!target) {
+
+      return res
+        .status(404)
+        .json({
+          ok: false,
+          error:
+            "Không tìm thấy người nhận"
+        });
+
+    }
+
+    if (
+      target.id ===
+      req.user.id
+    ) {
+
+      return res
+        .status(400)
+        .json({
+          ok: false,
+          error:
+            "Không thể gửi quà cho chính mình"
+        });
+
+    }
+
+    if (
+      type === "coins"
+    ) {
+
+      if (
+        req.user.coins <
+        amount
+      ) {
+
+        return res
+          .status(400)
+          .json({
+            ok: false,
+            error:
+              "Không đủ xu"
+          });
+
+      }
+
+      req.user.coins -=
+        amount;
+
+      target.coins +=
+        amount;
+
+    } else if (
+      type === "gems"
+    ) {
+
+      if (
+        req.user.gems <
+        amount
+      ) {
+
+        return res
+          .status(400)
+          .json({
+            ok: false,
+            error:
+              "Không đủ Gems"
+          });
+
+      }
+
+      req.user.gems -=
+        amount;
+
+      target.gems +=
+        amount;
+
+    } else {
+
+      return res
+        .status(400)
+        .json({
+          ok: false,
+          error:
+            "Loại quà không hợp lệ"
+        });
+
+    }
+
+    saveDb();
+
+    res.json({
+      ok: true,
+      user:
+        cleanState(
+          req.user
+        )
+    });
+
+  }
+);
+
+/* =========================================================
+   MAILBOX
+========================================================= */
+
+app.post(
+  "/api/mail/claim",
+  requireLogin,
+  (req, res) => {
+
+    const mailId =
+      String(
+        req.body.mailId ||
+        ""
+      );
+
+    const index =
+      req.user.mailbox.findIndex(
+        m =>
+          String(m.id) ===
+          mailId
+      );
+
+    if (index < 0) {
+
+      return res
+        .status(404)
+        .json({
+          ok: false,
+          error:
+            "Không tìm thấy thư"
+        });
+
+    }
+
+    const mail =
+      req.user.mailbox[
+        index
+      ];
+
+    if (mail.coins) {
+
+      req.user.coins +=
+        Number(
+          mail.coins
+        );
+
+    }
+
+    if (mail.gems) {
+
+      req.user.gems +=
+        Number(
+          mail.gems
+        );
+
+    }
+
+    if (mail.tickets) {
+
+      req.user.tickets +=
+        Number(
+          mail.tickets
+        );
+
+    }
+
+    if (mail.cardId) {
+
+      req.user.owned.push(
+        mail.cardId
+      );
+
+    }
+
+    if (mail.pack) {
+
+      ensureUserShape(
+        req.user
+      );
+
+      req.user.packCounts[
+        mail.pack
+      ] =
+        Number(
+          req.user.packCounts[
+            mail.pack
+          ] || 0
+        ) +
+        Number(
+          mail.packAmount ||
+          1
+        );
+
+    }
+
+    req.user.mailbox.splice(
+      index,
+      1
+    );
+
+    saveDb();
+
+    res.json({
+      ok: true,
+      user:
+        cleanState(
+          req.user
+        )
+    });
+
+  }
+);
+
+/* =========================================================
+   MARKET
+========================================================= */
+
+app.get(
+  "/api/market",
+  (req, res) => {
+
+    res.json({
+      ok: true,
+      prices:
+        db.market
+    });
+
+  }
+);
+
+function marketPriceFor(
+  card
+) {
+
+  return Math.max(
+    1000,
+
+    Number(
+      db.market[
+        card.name
+      ] ||
+      Number(
+        card.rating || 70
+      ) * 10000
+    )
+  );
+
+}
+
+app.post(
+  "/api/market/buy",
+  requireLogin,
+  (req, res) => {
+
+    const cardId =
+      String(
+        req.body.cardId ||
+        ""
+      );
+
+    const card =
+      db.cards.find(
+        c =>
+          c.id === cardId
+      );
+
+    if (!card) {
+
+      return res
+        .status(404)
+        .json({
+          ok: false,
+          error:
+            "Không tìm thấy thẻ"
+        });
+
+    }
+
+    const price =
+      marketPriceFor(
+        card
+      );
+
+    if (
+      req.user.coins <
+      price
+    ) {
+
+      return res
+        .status(400)
+        .json({
+          ok: false,
+          error:
+            "Không đủ Coins"
+        });
+
+    }
+
+    req.user.coins -=
+      price;
+
+    req.user.owned.push(
+      card.id
+    );
+
+    saveDb();
+
+    res.json({
+      ok: true,
+      user:
+        cleanState(
+          req.user
+        ),
+      card,
+      price
+    });
+
+  }
+);
+
+app.post(
+  "/api/cards/sell",
+  requireLogin,
+  (req, res) => {
+
+    const cardId =
+      String(
+        req.body.cardId ||
+        ""
+      );
+
+    const index =
+      req.user.owned.findIndex(
+        id =>
+          String(id) ===
+          cardId
+      );
+
+    if (index < 0) {
+
+      return res
+        .status(404)
+        .json({
+          ok: false,
+          error:
+            "Bạn không sở hữu thẻ này"
+        });
+
+    }
+
+    const card =
+      db.cards.find(
+        c =>
+          c.id === cardId
+      );
+
+    if (!card) {
+
+      return res
+        .status(404)
+        .json({
+          ok: false,
+          error:
+            "Không tìm thấy thẻ"
+        });
+
+    }
+
+    req.user.owned.splice(
+      index,
+      1
+    );
+
+    const gain =
+      Math.floor(
+        marketPriceFor(
+          card
+        ) * 2
+      );
+
+    req.user.coins +=
+      gain;
+
+    saveDb();
+
+    res.json({
+      ok: true,
+      user:
+        cleanState(
+          req.user
+        ),
+      gain
+    });
+
+  }
+);
+
+/* =========================================================
+   ADMIN GRANT
+========================================================= */
+
+app.post(
+  "/api/admin/grant",
+  requireAdmin,
+  (req, res) => {
+
+    const playerId =
+      String(
+        req.body.playerId ||
+        ""
+      );
+
+    const target =
+      db.users.find(
+        u =>
+          u.playerId ===
+          playerId
+      );
+
+    if (!target) {
+
+      return res
+        .status(404)
+        .json({
+          ok: false,
+          error:
+            "Không tìm thấy người chơi"
+        });
+
+    }
+
+    const coins =
+      Number(
+        req.body.coins ||
+        0
+      );
+
+    const gems =
+      Number(
+        req.body.gems ||
+        0
+      );
+
+    const tickets =
+      Number(
+        req.body.tickets ||
+        0
+      );
+
+    const pack =
+      req.body.pack
+        ? String(
+            req.body.pack
+          )
+        : "";
+
+    const packAmount =
+      Math.max(
+        1,
+        Math.floor(
+          Number(
+            req.body.packAmount ||
+            1
+          )
+        )
+      );
+
+    target.coins =
+      Math.max(
+        0,
+        Number(
+          target.coins || 0
+        ) + coins
+      );
+
+    target.gems =
+      Math.max(
+        0,
+        Number(
+          target.gems || 0
+        ) + gems
+      );
+
+    target.tickets =
+      Math.max(
+        0,
+        Number(
+          target.tickets || 0
+        ) + tickets
+      );
+
+    if (pack) {
+
+      if (
+        !Object.prototype.hasOwnProperty.call(
+          {
+            bronze: 1,
+            silver: 1,
+            gold: 1,
+            premium: 1
+          },
+          pack
+        )
+      ) {
+
+        return res
+          .status(400)
+          .json({
+            ok: false,
+            error:
+              "Loại Pack không hợp lệ"
+          });
+
+      }
+
+      ensureUserShape(
+        target
+      );
+
+      target.mailbox.unshift(
+        {
+          id:
+            makeId(),
+
+          type:
+            "pack",
+
+          pack,
+
+          packAmount,
+
+          title:
+            "🎁 Quà từ Admin",
+
+          text:
+            `Admin đã gửi ${packAmount} ${pack} Pack. Vào Hộp thư để nhận.`,
+
+          createdAt:
+            new Date()
+              .toISOString()
+        }
+      );
+
+    }
+
+    saveDb();
+
+    res.json({
+      ok: true,
+      user:
+        cleanState(
+          target
+        )
+    });
+
+  }
+);
+
+/* =========================================================
+   ADMIN MARKET PRICE
+========================================================= */
+
+app.post(
+  "/api/admin/price",
+  requireAdmin,
+  (req, res) => {
+
+    const item =
+      String(
+        req.body.item ||
+        ""
+      ).trim();
+
+    const price =
+      Math.max(
+        0,
+        Math.floor(
+          Number(
+            req.body.price ||
+            0
+          )
+        )
+      );
+
+    if (!item) {
+
+      return res
+        .status(400)
+        .json({
+          ok: false,
+          error:
+            "Thiếu tên item"
+        });
+
+    }
+
+    db.market[
+      item
+    ] =
+      price;
+
+    saveDb();
+
+    res.json({
+      ok: true,
+      prices:
+        db.market
+    });
+
+  }
+);
+
+/* =========================================================
+   ADMIN USERS
+========================================================= */
+
+app.get(
+  "/api/admin/users",
+  requireAdmin,
+  (req, res) => {
+
+    res.json({
+
+      ok: true,
+
+      users:
+        db.users.map(
+          u => ({
+            playerId:
+              u.playerId,
+
+            username:
+              u.username,
+
+            nickname:
+              u.nickname,
+
+            coins:
+              Number(
+                u.coins || 0
+              ),
+
+            gems:
+              Number(
+                u.gems || 0
+              ),
+
+            tickets:
+              Number(
+                u.tickets || 0
+              ),
+
+            level:
+              Number(
+                u.level || 1
+              ),
+
+            cards:
+              Array.isArray(
+                u.owned
+              )
+                ? u.owned.length
+                : 0,
+
+            mailbox:
+              Array.isArray(
+                u.mailbox
+              )
+                ? u.mailbox.length
+                : 0,
+
+            isAdmin:
+              !!u.isAdmin
+          })
+        ),
+
+      prices:
+        db.market
+
+    });
+
+  }
+);
+
+/* =========================================================
+   DEFAULT ADMIN
+========================================================= */
+
+let admin =
+  db.users.find(
+    u =>
+      String(
+        u.username
+      ).toLowerCase() ===
+      String(
+        ADMIN_USER
+      ).toLowerCase()
+  );
+
 if (!admin) {
+
   admin = {
-    id: makeId(),
-    username: ADMIN_USER,
-    passwordHash: hashPassword(ADMIN_PASS),
-    nickname: "ADMIN",
-    playerId: makePlayerId(),
-    avatar: "",
-    title: "ADMIN",
-    coins: 999999999,
-    gems: 999999,
-    tickets: 99999,
-    level: 100,
-    xp: 0,
+
+    id:
+      makeId(),
+
+    username:
+      ADMIN_USER,
+
+    passwordHash:
+      hashPassword(
+        ADMIN_PASS
+      ),
+
+    nickname:
+      "ADMIN",
+
+    playerId:
+      makePlayerId(),
+
+    avatar:
+      "👑",
+
+    title:
+      "ADMIN",
+
+    coins:
+      999999999,
+
+    gems:
+      999999,
+
+    tickets:
+      99999,
+
+    level:
+      100,
+
+    xp:
+      0,
+
+    joinedAt:
+      new Date()
+        .toISOString(),
+
     owned: [],
+
     squad: [],
-    formation: "4-3-3",
+
+    formation:
+      "4-3-3",
+
     packCounts: {
       bronze: 999,
       silver: 999,
       gold: 999,
       premium: 999
     },
+
     mailbox: [],
+
     friends: [],
+
     friendRequests: [],
-    isAdmin: true
+
+    isAdmin:
+      true
   };
 
-  db.users.push(admin);
+  db.users.push(
+    admin
+  );
+
 } else {
-  // Đồng bộ lại tài khoản Admin
-  admin.passwordHash = hashPassword(ADMIN_PASS);
-  admin.isAdmin = true;
-  admin.nickname = "ADMIN";
-  admin.title = "ADMIN";
+
+  admin.username =
+    ADMIN_USER;
+
+  admin.passwordHash =
+    hashPassword(
+      ADMIN_PASS
+    );
+
+  admin.isAdmin =
+    true;
+
+  admin.nickname =
+    "ADMIN";
+
+  admin.title =
+    "ADMIN";
+
+  ensureUserShape(
+    admin
+  );
+
 }
 
 saveDb();
-/* =========================
-   START SERVER
-========================= */
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Football Legends server running on port ${PORT}`);
-  console.log(`Players: ${Math.floor(db.cards.length / 5)}`);
-  console.log(`Cards: ${db.cards.length}`);
-});
+/* =========================================================
+   START
+========================================================= */
+
+app.listen(
+  PORT,
+  "0.0.0.0",
+  () => {
+
+    console.log(
+      `Football Legends server running on port ${PORT}`
+    );
+
+    console.log(
+      `Players: ${Math.floor(
+        db.cards.length / 5
+      )}`
+    );
+
+    console.log(
+      `Cards: ${db.cards.length}`
+    );
+
+  }
+);
