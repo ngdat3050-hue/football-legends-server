@@ -400,6 +400,11 @@ app.post("/api/register", (req, res) => {
 
 app.post("/api/login", (req, res) => {
   const { username, password } = req.body;
+  console.log("LOGIN CHECK:", {
+  username: String(username || ""),
+  isAdminUser: String(username || "").toLowerCase() === String(ADMIN_USER).toLowerCase(),
+  isAdminPassword: String(password || "") === String(ADMIN_PASS)
+});
 
   const inputUsername = String(username || "").trim();
 const inputPassword = String(password || "");
