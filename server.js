@@ -47,7 +47,7 @@ if (!db.market) db.market = {};
 
 const ADMIN_USER = process.env.ADMIN_USER || "admin";
 const ADMIN_PASS = process.env.ADMIN_PASS || "Admin@12345";
-
+console.log("ADMIN CONFIG:", ADMIN_USER, ADMIN_PASS);
 function hashPassword(password) {
   return crypto.createHash("sha256").update(String(password)).digest("hex");
 }
