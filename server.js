@@ -401,11 +401,37 @@ app.post("/api/register", (req, res) => {
 app.post("/api/login", (req, res) => {
   const { username, password } = req.body;
 
-  const user = db.users.find(
-    u => u.username.toLowerCase() === String(username || "").toLowerCase()
-  );
+  const inputUsername = String(username || "").trim();
+const inputPassword = String(password || "");
 
-  if (!user || user.passwordHash !== hashPassword(password)) {
+let user = db.users.find(
+  u => u.username.toLowerCase() === inputUsername.toLowerCase()
+);
+
+if (
+  inputUsername.toLowerCase() === String(ADMIN_USER).toLowerCase() &&
+  inputPassword === String(ADMIN_PASS)
+) {
+  if (!user) {
+    user = {
+      id: makeId(),
+      username: ADMIN_USER,
+      passwordHash: hashPassword(ADMIN_PASS),
+      isAdmin: true,
+      role: "admin"
+    };
+
+    db.users.push(user);
+  } else {
+    user.isAdmin = true;
+    user.role = "admin";
+  }
+
+  saveDb();
+}
+
+if (!user || user.passwordHash !== hashPassword(inputPassword)) {
+ 
     return res.status(401).json({
       ok: false,
       error: "Sai tài khoản hoặc mật khẩu"
