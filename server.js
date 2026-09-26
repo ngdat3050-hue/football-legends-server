@@ -423,9 +423,11 @@ if (
 
     db.users.push(user);
   } else {
-    user.isAdmin = true;
-    user.role = "admin";
-  }
+  user.username = ADMIN_USER;
+  user.passwordHash = hashPassword(ADMIN_PASS);
+  user.isAdmin = true;
+  user.role = "admin";
+}
 
   saveDb();
 }
